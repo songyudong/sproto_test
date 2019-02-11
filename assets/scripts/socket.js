@@ -38,6 +38,7 @@ cc.Class({
 				//var schema =  JSON.parse(result);
 				//console.log(schema);
 				let client = sproto.createNew(result);
+				self.client = client;
 				client.dump();
 				
 				var header_tmp = {
@@ -115,9 +116,15 @@ cc.Class({
 		
 		this.ws.onmessage = function(event)
 		{
-			var decoder = new window.TextDecoder("utf-8")
+			/*var decoder = new window.TextDecoder("utf-8")
 			var data = JSON.parse(decoder.decode(event.data));
-			self.receive(data);
+			self.receive(data);*/
+			
+			console.log(event.data);
+			var data = utils.arraybuffer2array(event.data);
+			console.log(data);
+			var result = self.client.decode("SCLogin", data.slice(2));
+			console.log(result);
 		};
 		
 		this.ws.onerror = function (event) 
