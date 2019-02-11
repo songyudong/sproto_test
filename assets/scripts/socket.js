@@ -123,6 +123,9 @@ cc.Class({
 			console.log(event.data);
 			var data = utils.arraybuffer2array(event.data);
 			console.log(data);
+			var dataview = new DataView(event.data);
+			var msgId = dataview.getUint16(0);
+			console.log("id=:"+msgId);
 			var result = self.client.decode("SCLogin", data.slice(2));
 			console.log(result);
 		};
