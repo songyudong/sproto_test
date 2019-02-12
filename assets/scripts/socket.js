@@ -15,7 +15,8 @@ cc.Class({
 	{
 		var b = new ArrayBuffer(array.length);
 		var v = new DataView(b, 0);
-		for (var i = 0; i < array.length; i++) {
+		for (var i = 0; i < array.length; i++) 
+		{
 			v.setUint8(i, array[i]);
 		}
 
@@ -24,59 +25,40 @@ cc.Class({
 
     onLoad () 
 	{
+		this.mapNameToId = new Map();
+		this.mapIdToName = new Map();
+		
 		var self = this;
 		var url = cc.url.raw("resources/protocol.spb");
 		var xhr = cc.loader.getXMLHttpRequest();
 		xhr.open("GET", url, true);
 		xhr.responseType = "arraybuffer";
-		xhr.onload = function (oEvent) {
+		xhr.onload = function (oEvent) 
+		{
 			var arrayBuffer = xhr.response;
-			if (arrayBuffer) {
+			if (arrayBuffer) 
+			{
 				var result = new Uint8Array(arrayBuffer);
-				// 任何需要的处理
-				console.log(result);
-				//var schema =  JSON.parse(result);
-				//console.log(schema);
+				
+				//console.log(result);
+				
 				let client = sproto.createNew(result);
 				self.client = client;
-				client.dump();
+				//client.dump();
 				
-				var header_tmp = {
-					"type":12,
-					"session":45,
-				};
-				//header_tmp.Type = 12;
-				//header_tmp.Session = 45;
-				var header_buffer = client.encode("Header", header_tmp);
-				var header_d = client.decode("Header", header_buffer);
-				console.log(header_d);
-				
-				var msg = {
-					"Name" :  "songyudong",
-					
+				for(let i=0; i<client.type.length; i++)
+				{
+					let t = client.type[i];
+					self.mapNameToId.set(t.name, i);
+					self.mapIdToName.set(i, t.name);
 				}
-
-				var buffer = client.encode("Hello", msg)
 				
-				
-
-				var r = client.decode("Hello", buffer)
-				console.log(r);
-				
-				var msgId = [0x0, 0x0];
-				
-				console.log(header_buffer);
-				console.log(buffer);
-				//var sendData = utils.arrayconcat(header_buffer, buffer);
-				var sendData = utils.arrayconcat(msgId, buffer);
-				self.sendData = self.arrayToArrayBuffer(sendData);
-				//self.sendData = sendData;
-				console.log(sendData);
-				console.log(self.sendData);
-								
+				//console.log(self.mapNameToId);
+				//console.log(self.mapIdToName);
 				self.connect();		
 			}
-			else {
+			else 
+			{
 				
 			}
 		}
@@ -95,39 +77,39 @@ cc.Class({
 			cc.log("socket has already inited");
 			return;
 		}
-		var url = "ws://" + "192.168.1.4" + ":" + 3653;
+		var url = "ws://" + "127.0.0.1" + ":" + 3653;
 		this.ws = new WebSocket(url);
 		this.ws.binaryType = "arraybuffer"
 		var self = this;
 		this.ws.onopen = function()
 		{
-			cc.log("login");
-			cc.log(self.ws);
+			//cc.log("login");
+			//cc.log(self.ws);
 			
 			
 			self.inited = true;
-			/*self.ws.send(JSON.stringify({CSLogin:{
-					UserName:'songyudong',
-					Password:'111111'
-				}}))
-			*/
-			self.ws.send(self.sendData);
+			
+			//self.ws.send(self.sendData);
+			var msg = 
+			{
+				"Name" :  "songyudong",					
+			}
+			self.send("Hello", msg); 
 		};
 		
 		this.ws.onmessage = function(event)
 		{
-			/*var decoder = new window.TextDecoder("utf-8")
-			var data = JSON.parse(decoder.decode(event.data));
-			self.receive(data);*/
-			
-			console.log(event.data);
+			//console.log(event.data);
 			var data = utils.arraybuffer2array(event.data);
-			console.log(data);
+			//console.log(data);
 			var dataview = new DataView(event.data);
 			var msgId = dataview.getUint16(0);
-			console.log("id=:"+msgId);
-			var result = self.client.decode("SCLogin", data.slice(2));
-			console.log(result);
+			//console.log("id=:"+msgId);
+			//console.log(self.mapIdToName);
+			var result = self.client.decode(self.mapIdToName.get(msgId), data.slice(2));
+			//console.log(result);
+			
+			self.receive(self.mapIdToName.get(msgId), result);
 		};
 		
 		this.ws.onerror = function (event) 
@@ -144,12 +126,11 @@ cc.Class({
 	
 	
     start () 
-	{
-		//this.connect();
+	{	
 		
     },
 	
-	send:function(data)
+	send:function(msgName, msgParam)
 	{
 		//cc.log(this.ws)
 		if(this.inited==false)
@@ -158,9 +139,24 @@ cc.Class({
 		}
 		else if(this.ws.readyState == WebSocket.OPEN)
 		{
-			//cc.log("send msg:"+data)
-			let pdata = JSON.stringify(data);
-			this.ws.send(pdata);
+			var buffer = this.client.encode(msgName, msgParam);
+			var id = this.mapNameToId.get(msgName);
+			//console.log("msg name = " + msgName);
+			//console.log("msg id = " + id);
+			var msgId = [0x0, 0x0];
+			msgId[0] = id<<8;
+			msgId[1] = id&0xFF;
+			
+			
+			//console.log(buffer);
+			
+			var sendData = utils.arrayconcat(msgId, buffer);
+			var sendDataBuffer = this.arrayToArrayBuffer(sendData);
+			
+			//console.log(sendData);
+			//console.log(sendDataBuffer);
+			this.ws.send(sendDataBuffer);	
+								
 		}
 		else
 		{
@@ -169,10 +165,11 @@ cc.Class({
 			
 	},
 	
-	receive:function(data)
+	receive:function(msgName, msgParam)
 	{
-		//cc.log("receive messsage:" + data)
-		this.node.emit("receive", data);
+		cc.log("receive messsage msgname =" + msgName);
+		cc.log(msgParam);
+		this.node.emit("receive", msgName, msgParam);
 	},
 	
 
