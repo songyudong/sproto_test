@@ -1,2 +1,2 @@
-# sproto_tes
+# sproto_test
 cocos creator project
